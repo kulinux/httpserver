@@ -13,39 +13,46 @@ import java.io.InputStreamReader
 class HttpServer(val port: Int):
 
   def start(): IO[Unit] =
-    println("crating")
-    openPort().use(ss =>
-      for {
-        socket <- acceptConnection(ss)
-        (is, os) <- openWriter(socket)
-        _ <- readAll(is)
-        _ <- writeHttpHello(os)
-        _ <- closeSocket(socket)
-      } yield ()
+    openPort(port)
+      .flatMap(openSocket)
+      .use(socket =>
+        for {
+          (is, os) <- openWriter(socket)
+          read <- readAll(is)
+          _ <- IO.println(read)
+          _ <- writeHttpHello(os)
+        } yield ()
+      )
+
+  def openPort(port: Int): Resource[IO, ServerSocket] =
+    def openSS(port: Int): IO[ServerSocket] = IO(ServerSocket(port))
+    def closeSS(ss: ServerSocket): IO[Unit] = IO(ss.close())
+    Resource.make[IO, ServerSocket](openSS(port))(closeSS)
+
+  def openSocket(ss: ServerSocket): Resource[IO, Socket] =
+    def acceptConnection(ss: ServerSocket): IO[Socket] = IO(ss.accept())
+    def closeSocket(s: Socket): IO[Unit] = IO(s.close())
+    Resource.make[IO, Socket](acceptConnection(ss))(
+      closeSocket
     )
 
-  def openPort(): Resource[IO, ServerSocket] =
-    Resource.make[IO, ServerSocket](openSS())(closeSS)
-
-  def openSS(): IO[ServerSocket] = IO(ServerSocket(port))
-  def closeSS(ss: ServerSocket): IO[Unit] = IO(ss.close())
-  def acceptConnection(ss: ServerSocket): IO[Socket] = IO(ss.accept())
   def openWriter(s: Socket): IO[(InputStream, OutputStream)] = IO(
     (s.getInputStream(), s.getOutputStream())
   )
   def writeHttpHello(os: OutputStream): IO[Unit] = IO({
-    os.write("HTTP/1.1 200 OK\n\n".getBytes())
+    os.write("HTTP/1.1 200 OK\r\n\r\n".getBytes())
   })
-  def readAll(is: InputStream): IO[Unit] = IO({
+  def readAll(is: InputStream): IO[String] = IO({
     val bufferedReader =
       new BufferedReader(new InputStreamReader(is))
     var stop = false
+    var res = ""
     while (!stop) {
       val line = bufferedReader.readLine()
-      println("read from stream" + line)
+      res += line + "\n"
       if (line.length() == 0) {
         stop = true
       }
     }
+    res
   })
-  def closeSocket(s: Socket): IO[Unit] = IO(s.close())

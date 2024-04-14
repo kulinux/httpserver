@@ -28,9 +28,7 @@ class Http extends AnyFeatureSpec with GivenWhenThen with Matchers {
       When("I create a connection with port")
       val request = basicRequest.get(uri"http://127.0.0.1:$Port")
       val backend = HttpClientSyncBackend()
-      println("start request send")
       val response = request.send(backend)
-      println("request send")
 
       Then("Connection is successfully open")
       response.isSuccess shouldBe true
