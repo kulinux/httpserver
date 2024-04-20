@@ -20,13 +20,15 @@ class HttpServer(val port: Int):
 
     rSocket
       .use(socket => app(socket))
+      .handleError(err => err.printStackTrace())
 
   def app(socket: Socket): IO[Unit] =
     for {
       (is, os) <- openWriter(socket)
       read <- readAll(is)
       _ <- IO.println(read)
-      _ <- writeHttpHello(os)
+      request = parseHttp(read)
+      _ <- writeHttpHello(os, request)
     } yield ()
 
   def openPort(port: Int): Resource[IO, ServerSocket] =
@@ -44,17 +46,20 @@ class HttpServer(val port: Int):
   def openWriter(s: Socket): IO[(InputStream, OutputStream)] = IO(
     (s.getInputStream(), s.getOutputStream())
   )
-  def writeHttpHello(os: OutputStream): IO[Unit] = IO({
+  def writeHttpHello(
+      os: OutputStream,
+      file: Either[String, HttpRequest]
+  ): IO[Unit] = IO({
     os.write("HTTP/1.1 200 OK\r\n\r\n".getBytes())
   })
-  def readAll(is: InputStream): IO[String] = IO({
+  def readAll(is: InputStream): IO[List[String]] = IO({
     val bufferedReader =
       new BufferedReader(new InputStreamReader(is))
     var stop = false
-    var res = ""
+    var res = List[String]()
     while (!stop) {
       val line = bufferedReader.readLine()
-      res += line + "\n"
+      res = res :+ line
       if (line.length() == 0) {
         stop = true
       }
