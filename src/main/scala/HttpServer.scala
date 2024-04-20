@@ -13,16 +13,21 @@ import java.io.InputStreamReader
 class HttpServer(val port: Int):
 
   def start(): IO[Unit] =
-    openPort(port)
-      .flatMap(openSocket)
-      .use(socket =>
-        for {
-          (is, os) <- openWriter(socket)
-          read <- readAll(is)
-          _ <- IO.println(read)
-          _ <- writeHttpHello(os)
-        } yield ()
-      )
+    val rSocket = for {
+      server <- openPort(port)
+      socket <- openSocket(server)
+    } yield socket
+
+    rSocket
+      .use(socket => app(socket))
+
+  def app(socket: Socket): IO[Unit] =
+    for {
+      (is, os) <- openWriter(socket)
+      read <- readAll(is)
+      _ <- IO.println(read)
+      _ <- writeHttpHello(os)
+    } yield ()
 
   def openPort(port: Int): Resource[IO, ServerSocket] =
     def openSS(port: Int): IO[ServerSocket] = IO(ServerSocket(port))

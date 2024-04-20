@@ -17,13 +17,19 @@ class Http extends AnyFeatureSpec with GivenWhenThen with Matchers {
   info("Http Server")
 
   feature("Bind Http Port") {
-    scenario("bind http port") {
-      Given("Http server")
+
+    def setupHttpServer() = {
       val httpServer = HttpServer(Port)
       val startServer = Future {
         httpServer.start().unsafeRunSync()
       }
       Thread.sleep(1000)
+    }
+
+    scenario("response ok") {
+      Given("Http server")
+
+      setupHttpServer()
 
       When("I create a connection with port")
       val request = basicRequest.get(uri"http://127.0.0.1:$Port")
@@ -33,6 +39,19 @@ class Http extends AnyFeatureSpec with GivenWhenThen with Matchers {
       Then("Connection is successfully open")
       response.isSuccess shouldBe true
     }
-  }
 
+    scenario("bind http port") {
+      Given("Http server")
+
+      setupHttpServer()
+
+      When("I create a connection with port")
+      val request = basicRequest.get(uri"http://127.0.0.1:$Port/index.html")
+      val backend = HttpClientSyncBackend()
+      val response = request.send(backend)
+
+      Then("Connection is successfully open")
+      response.isSuccess shouldBe true
+    }
+  }
 }
