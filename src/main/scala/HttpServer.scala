@@ -46,12 +46,19 @@ class HttpServer(val port: Int):
   def openWriter(s: Socket): IO[(InputStream, OutputStream)] = IO(
     (s.getInputStream(), s.getOutputStream())
   )
+
   def writeHttpHello(
       os: OutputStream,
-      file: Either[String, HttpRequest]
-  ): IO[Unit] = IO({
-    os.write("HTTP/1.1 200 OK\r\n\r\n".getBytes())
-  })
+      request: Either[String, HttpRequest]
+  ): IO[Unit] =
+    val file = request.map(_.file())
+    if (file.isLeft) return IO.raiseError(Throwable(file.left.getOrElse("ok")))
+    val status = if (file.getOrElse("not found") == "/") 200 else 400
+
+    IO({
+      os.write(s"HTTP/1.1 $status OK\r\n\r\n".getBytes())
+    })
+
   def readAll(is: InputStream): IO[List[String]] = IO({
     val bufferedReader =
       new BufferedReader(new InputStreamReader(is))

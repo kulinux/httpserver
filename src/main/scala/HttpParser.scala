@@ -5,20 +5,26 @@ import cats.data._
 import cats.syntax.all._
 import sttp.client3.RequestT
 
-opaque type HttpRequest = List[String]
+opaque type HttpRequest = Request
 
-extension (self: HttpRequest)
-  def file(): Either[String, String] = Either.right[String, String]("")
+extension (self: HttpRequest) def file(): String = self.method.file
 
-def parseHttp(raw: List[String]): Either[String, HttpRequest] = ???
+def parseHttp(raw: List[String]): Either[String, HttpRequest] =
+  internalParseHttp(raw)
 
-case class StatusLine(status: Int, file: String)
+case class MethodLine(method: String, file: String)
 case class Header(header: String, value: String)
-case class Request(statusLine: StatusLine, headers: List[Header])
+case class Request(method: MethodLine, headers: List[Header])
 
-def parseStatusLine(raw: String): Either[String, StatusLine] = ???
+def parseMethodLine(raw: String): Either[String, MethodLine] =
+  val tokens = raw.split(" ")
+  if (tokens.length != 3) return s"Bad method line $raw".asLeft
+
+  val Array(method, file, _) = tokens
+
+  MethodLine(method, file).asRight
 
 def internalParseHttp(raw: List[String]): Either[String, Request] = for {
   head <- raw.headOption.toRight("No lines in header")
-  statusLine <- parseStatusLine(head)
+  statusLine <- parseMethodLine(head)
 } yield Request(statusLine, List())
